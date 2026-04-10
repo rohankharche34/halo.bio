@@ -1,8 +1,16 @@
 import Database from "better-sqlite3";
 import path from "path";
+import os from "os";
 
-const dbPath = path.join(process.cwd(), "halo.sqlite");
-const db = new Database(dbPath, { verbose: console.log });
+const dbDir = process.env.DB_PATH || path.join(os.homedir(), ".halo.bio");
+if (!process.env.DB_PATH) {
+  try {
+    require("fs").mkdirSync(dbDir, { recursive: true });
+  } catch {}
+}
+
+const dbPath = path.join(dbDir, "halo.sqlite");
+const db = new Database(dbPath, { verbose: process.env.NODE_ENV === "development" ? console.log : undefined });
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
