@@ -8,6 +8,7 @@ interface User {
   username: string;
   displayName: string;
   bioGoals: string | null;
+  settings: string | null;
 }
 
 interface AuthContextType {

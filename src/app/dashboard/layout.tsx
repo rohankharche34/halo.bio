@@ -4,6 +4,7 @@ import React, { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
 import { OnboardingModal } from "@/components/OnboardingModal";
+import { SpeechInterface } from "@/components/SpeechInterface";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function DashboardLayout({
@@ -39,6 +40,7 @@ export default function DashboardLayout({
       </main>
       
       <OnboardingModal />
+      <SpeechInterface />
     </div>
   );
 }
