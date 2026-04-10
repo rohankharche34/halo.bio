@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { getCurrentUser, signIn as serverSignIn, signOut as serverSignOut } from "@/app/actions/auth";
+import { getCurrentUser, signIn as serverSignIn, signUp as serverSignUp, signOut as serverSignOut } from "@/app/actions/auth";
 
 interface User {
   id: string;
@@ -15,7 +15,8 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   requireOnboarding: boolean;
-  signIn: (username: string) => Promise<void>;
+  signIn: (username: string, password: string) => Promise<void>;
+  signUp: (username: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   setOnboardingComplete: () => void;
 }
@@ -25,6 +26,7 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   requireOnboarding: false,
   signIn: async () => {},
+  signUp: async () => {},
   signOut: async () => {},
   setOnboardingComplete: () => {},
 });
@@ -54,14 +56,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     fetchUser();
   }, []);
 
-  const signIn = async (username: string) => {
+  const signIn = async (username: string, password: string) => {
     setLoading(true);
     try {
-      await serverSignIn(username);
+      await serverSignIn(username, password);
       await fetchUser();
     } catch (error) {
       console.error("Error signing in", error);
       setLoading(false);
+      throw error;
+    }
+  };
+
+  const signUp = async (username: string, password: string) => {
+    setLoading(true);
+    try {
+      await serverSignUp(username, password);
+      await fetchUser();
+    } catch (error) {
+      console.error("Error signing up", error);
+      setLoading(false);
+      throw error;
     }
   };
 
@@ -83,6 +98,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         loading,
         requireOnboarding,
         signIn,
+        signUp,
         signOut,
         setOnboardingComplete,
       }}

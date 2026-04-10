@@ -8,9 +8,12 @@ import { LogIn, Sun, Moon, Zap, Heart, Brain, Activity } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function Home() {
-  const { user, signIn, loading } = useAuth();
+  const { user, signIn, signUp, loading } = useAuth();
   const router = useRouter();
   const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [isSignup, setIsSignup] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (user && !loading) {
@@ -18,10 +21,19 @@ export default function Home() {
     }
   }, [user, loading, router]);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (username.trim()) {
-      signIn(username);
+    setError("");
+    if (!username.trim() || !password.trim()) return;
+    
+    try {
+      if (isSignup) {
+        await signUp(username, password);
+      } else {
+        await signIn(username, password);
+      }
+    } catch (err: any) {
+      setError(err.message || "Authentication failed");
     }
   };
 
@@ -95,25 +107,41 @@ export default function Home() {
           transition={{ delay: 0.6 }}
           className="mt-4"
         >
-          <form onSubmit={handleLogin} className="flex flex-col items-center space-y-4">
+          <form onSubmit={handleSubmit} className="flex flex-col items-center space-y-4">
             <input 
               type="text" 
-              placeholder="Enter your name..." 
+              placeholder="Username" 
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               className="px-6 py-3 w-72 bg-black/50 border border-white/20 rounded-full text-center text-white placeholder:text-zinc-600 focus:outline-none focus:border-[color:var(--color-halo-blue)] transition-colors"
               disabled={loading}
             />
+            <input 
+              type="password" 
+              placeholder="Password" 
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="px-6 py-3 w-72 bg-black/50 border border-white/20 rounded-full text-center text-white placeholder:text-zinc-600 focus:outline-none focus:border-[color:var(--color-halo-blue)] transition-colors"
+              disabled={loading}
+            />
+            {error && <p className="text-red-400 text-sm">{error}</p>}
             <button 
               type="submit"
-              disabled={loading || !username.trim()}
+              disabled={loading || !username.trim() || !password.trim()}
               className="group relative flex items-center space-x-3 px-8 py-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full transition-all hover:border-[color:var(--color-halo-blue)] hover:shadow-[0_0_30px_rgba(0,212,255,0.3)] disabled:opacity-50 cursor-pointer"
             >
               <LogIn size={20} className="text-[color:var(--color-halo-blue)]" />
               <span className="font-semibold tracking-wide text-white">
-                {loading ? "Authenticating..." : "Begin Journey"}
+                {loading ? "Authenticating..." : isSignup ? "Create Account" : "Sign In"}
               </span>
               <div className="absolute inset-0 rounded-full bg-gradient-to-r from-[color:var(--color-halo-blue)] to-[color:var(--color-halo-green)] opacity-0 group-hover:opacity-10 transition-opacity" />
+            </button>
+            <button 
+              type="button"
+              onClick={() => { setIsSignup(!isSignup); setError(""); }}
+              className="text-zinc-500 text-sm hover:text-white transition-colors"
+            >
+              {isSignup ? "Already have an account? Sign in" : "Create new account"}
             </button>
           </form>
         </motion.div>

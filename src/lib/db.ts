@@ -16,6 +16,7 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
     username TEXT UNIQUE NOT NULL,
+    passwordHash TEXT,
     displayName TEXT NOT NULL,
     bioGoals TEXT,
     settings TEXT,

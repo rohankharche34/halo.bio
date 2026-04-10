@@ -2,7 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { Activity, Settings, LogOut, Moon, Sun, UtensilsCrossed } from "lucide-react";
+import { Activity, Settings, LogOut, Moon, Sun, UtensilsCrossed, Calendar } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 export const Sidebar = () => {
@@ -11,6 +11,7 @@ export const Sidebar = () => {
   const nav = [
     { name: "Bio-Status", href: "/dashboard", icon: Activity },
     { name: "Food", href: "/food", icon: UtensilsCrossed },
+    { name: "Calendar", href: "/calendar", icon: Calendar },
     { name: "Settings", href: "/settings", icon: Settings },
   ];
 

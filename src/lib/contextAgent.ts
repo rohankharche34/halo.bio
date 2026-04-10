@@ -207,39 +207,38 @@ const veganMeals: MealRecommendation[] = [
 export async function calculateStabilityScore(): Promise<ContextScore> {
   const user = await getCurrentUser();
   if (!user) {
-    return { sleepScore: 0, circadianScore: 0, activityScore: 0, mealConsistency: 0, overallStability: 50 };
+    return { sleepScore: 0, circadianScore: 0, activityScore: 0, mealConsistency: 0, overallStability: 0 };
   }
 
-  const sleepLogs = await getSleepLogs(7);
-  const circadianLogs = await getCircadianHistory(7);
+  const sleepLogs = await getSleepLogs(30);
+  const circadianLogs = await getCircadianHistory(30);
 
-  let sleepScore = 50;
+  let sleepScore = 0;
   if (sleepLogs.length > 0) {
-    const avgQuality = sleepLogs.reduce((sum, l) => sum + l.quality, 0) / sleepLogs.length;
+    const avgQuality = sleepLogs.reduce((sum, l) => sum + (l.quality || 0), 0) / sleepLogs.length;
     sleepScore = Math.min(100, avgQuality * 10);
   }
 
-  let circadianScore = 50;
+  let circadianScore = 0;
   if (circadianLogs.length > 0) {
     const avgScore = circadianLogs.reduce((sum, l) => sum + (l.score || 0), 0) / circadianLogs.length;
     circadianScore = Math.min(100, avgScore);
   }
 
-  let activityScore = 50;
+  let activityScore = 0;
   if (circadianLogs.length > 0) {
     const avgActivity = circadianLogs.reduce((sum, l) => sum + (l.activityLevel || 0), 0) / circadianLogs.length;
     activityScore = Math.min(100, (avgActivity / 100) * 100);
   }
 
-  let mealConsistency = 50;
-  const mealCount = sleepLogs.length;
-  if (mealCount >= 5) mealConsistency = 80;
-  else if (mealCount >= 3) mealConsistency = 60;
-  else mealConsistency = 40;
+  const mealConsistency = Math.min(100, sleepLogs.length * 10);
 
-  const overallStability = Math.round(
-    (sleepScore * 0.3) + (circadianScore * 0.25) + (activityScore * 0.25) + (mealConsistency * 0.2)
-  );
+  let overallStability = 0;
+  if (sleepLogs.length > 0 || circadianLogs.length > 0) {
+    overallStability = Math.round(
+      (sleepScore * 0.3) + (circadianScore * 0.25) + (activityScore * 0.25) + (mealConsistency * 0.2)
+    );
+  }
 
   return { sleepScore, circadianScore, activityScore, mealConsistency, overallStability };
 }

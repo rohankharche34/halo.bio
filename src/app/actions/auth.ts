@@ -3,19 +3,44 @@
 import db from "@/lib/db";
 import { cookies } from "next/headers";
 import { randomUUID } from "crypto";
+import bcrypt from "bcryptjs";
 
-export async function signIn(username: string) {
-  if (!username) throw new Error("Username required");
+export async function signUp(username: string, password: string) {
+  if (!username || !password) throw new Error("Username and password required");
+  if (password.length < 6) throw new Error("Password must be at least 6 characters");
 
   const normalized = username.trim().toLowerCase();
   
-  let user = db.prepare("SELECT * FROM users WHERE username = ?").get(normalized) as any;
+  const existing = db.prepare("SELECT id FROM users WHERE username = ?").get(normalized);
+  if (existing) throw new Error("Username already taken");
+
+  const id = randomUUID();
+  const passwordHash = await bcrypt.hash(password, 10);
+  db.prepare("INSERT INTO users (id, username, passwordHash, displayName) VALUES (?, ?, ?, ?)").run(id, normalized, passwordHash, username.trim());
+
+  const cookieStore = await cookies();
+  cookieStore.set("halo_session", id, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 60 * 60 * 24 * 7,
+    path: "/",
+  });
+
+  return { success: true };
+}
+
+export async function signIn(username: string, password: string) {
+  if (!username || !password) throw new Error("Username and password required");
+
+  const normalized = username.trim().toLowerCase();
+  const user = db.prepare("SELECT * FROM users WHERE username = ?").get(normalized) as any;
   
-  if (!user) {
-    const id = randomUUID();
-    db.prepare("INSERT INTO users (id, username, displayName) VALUES (?, ?, ?)").run(id, normalized, username.trim());
-    user = db.prepare("SELECT * FROM users WHERE id = ?").get(id);
-  }
+  if (!user) throw new Error("Invalid username or password");
+
+  if (!user.passwordHash) throw new Error("Please use passwordless login for this account");
+
+  const valid = await bcrypt.compare(password, user.passwordHash);
+  if (!valid) throw new Error("Invalid username or password");
 
   const cookieStore = await cookies();
   cookieStore.set("halo_session", user.id, {

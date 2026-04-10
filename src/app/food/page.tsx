@@ -1,14 +1,16 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Camera, MapPin, ChefHat, ArrowLeft, Utensils, Leaf } from "lucide-react";
-import { PantryVision } from "@/components/PantryVision";
+import { Camera, MapPin, ChefHat, ArrowLeft, UtensilsCrossed, Search, Loader2, AlertCircle } from "lucide-react";
 import { NearbyHealthy } from "@/components/NearbyHealthy";
 import { MealRecommendations } from "@/components/MealRecommendations";
+import { NutritionLookup } from "@/components/NutritionLookup";
 
 export default function FoodPage() {
+  const [activeTab, setActiveTab] = useState<"recommend" | "nutrition" | "nearby">("recommend");
+
   return (
     <div className="max-w-6xl mx-auto">
       <motion.div 
@@ -25,31 +27,72 @@ export default function FoodPage() {
         <h1 className="text-3xl font-bold text-white">Food & Nutrition</h1>
       </motion.div>
 
+      <div className="flex space-x-2 mb-6">
+        <button
+          onClick={() => setActiveTab("recommend")}
+          className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+            activeTab === "recommend" 
+              ? "bg-[color:var(--color-halo-blue)] text-black" 
+              : "bg-white/5 text-zinc-400 hover:text-white"
+          }`}
+        >
+          <ChefHat size={16} className="inline mr-2" />
+          Recommend
+        </button>
+        <button
+          onClick={() => setActiveTab("nutrition")}
+          className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+            activeTab === "nutrition" 
+              ? "bg-[color:var(--color-halo-blue)] text-black" 
+              : "bg-white/5 text-zinc-400 hover:text-white"
+          }`}
+        >
+          <Search size={16} className="inline mr-2" />
+          Nutrition Lookup
+        </button>
+        <button
+          onClick={() => setActiveTab("nearby")}
+          className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+            activeTab === "nearby" 
+              ? "bg-[color:var(--color-halo-blue)] text-black" 
+              : "bg-white/5 text-zinc-400 hover:text-white"
+          }`}
+        >
+          <MapPin size={16} className="inline mr-2" />
+          Nearby
+        </button>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-        >
-          <MealRecommendations />
-        </motion.div>
+        {activeTab === "recommend" && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="lg:col-span-2"
+          >
+            <MealRecommendations />
+          </motion.div>
+        )}
 
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
-          <PantryVision />
-        </motion.div>
+        {activeTab === "nutrition" && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="lg:col-span-2"
+          >
+            <NutritionLookup />
+          </motion.div>
+        )}
 
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="lg:col-span-2"
-        >
-          <NearbyHealthy />
-        </motion.div>
+        {activeTab === "nearby" && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="lg:col-span-2"
+          >
+            <NearbyHealthy />
+          </motion.div>
+        )}
       </div>
     </div>
   );

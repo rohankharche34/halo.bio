@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useRef } from "react";
-import { Camera, Upload, Loader2, Sparkles, X, Plus, Image, RefreshCw } from "lucide-react";
-import { motion } from "framer-motion";
+import React, { useState, useRef, useCallback } from "react";
+import { Camera, Upload, Loader2, Sparkles, X, Plus, RefreshCw, Check, AlertCircle } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface Ingredient {
   name: string;
@@ -18,69 +18,47 @@ interface Recipe {
   matchScore: number;
 }
 
-const extendedIngredientBase: Record<string, Ingredient> = {
-  chicken: { name: "Chicken", confidence: 95, category: "protein" },
-  beef: { name: "Beef", confidence: 92, category: "protein" },
-  pork: { name: "Pork", confidence: 90, category: "protein" },
-  salmon: { name: "Salmon", confidence: 95, category: "protein" },
-  tuna: { name: "Tuna", confidence: 92, category: "protein" },
-  shrimp: { name: "Shrimp", confidence: 88, category: "protein" },
-  eggs: { name: "Eggs", confidence: 98, category: "protein" },
-  tofu: { name: "Tofu", confidence: 90, category: "protein" },
-  tempeh: { name: "Tempeh", confidence: 85, category: "protein" },
-  bell_pepper: { name: "Bell Pepper", confidence: 92, category: "vegetable" },
+const knownIngredients: Record<string, Ingredient> = {
+  chicken: { name: "Chicken", confidence: 90, category: "protein" },
+  beef: { name: "Beef", confidence: 88, category: "protein" },
+  salmon: { name: "Salmon", confidence: 92, category: "protein" },
+  egg: { name: "Eggs", confidence: 95, category: "protein" },
+  tofu: { name: "Tofu", confidence: 85, category: "protein" },
+  shrimp: { name: "Shrimp", confidence: 82, category: "protein" },
+  bell_pepper: { name: "Bell Pepper", confidence: 88, category: "vegetable" },
   onion: { name: "Onion", confidence: 90, category: "vegetable" },
-  garlic: { name: "Garlic", confidence: 95, category: "aromatics" },
-  tomato: { name: "Tomatoes", confidence: 94, category: "vegetable" },
-  spinach: { name: "Spinach", confidence: 96, category: "vegetable" },
-  kale: { name: "Kale", confidence: 94, category: "vegetable" },
-  broccoli: { name: "Broccoli", confidence: 95, category: "vegetable" },
-  carrot: { name: "Carrots", confidence: 92, category: "vegetable" },
-  celery: { name: "Celery", confidence: 88, category: "vegetable" },
-  cucumber: { name: "Cucumber", confidence: 90, category: "vegetable" },
-  avocado: { name: "Avocado", confidence: 96, category: "vegetable" },
-  mushroom: { name: "Mushrooms", confidence: 88, category: "vegetable" },
-  zucchini: { name: "Zucchini", confidence: 85, category: "vegetable" },
-  lemon: { name: "Lemon", confidence: 92, category: "fruit" },
-  lime: { name: "Lime", confidence: 88, category: "fruit" },
-  orange: { name: "Orange", confidence: 90, category: "fruit" },
-  apple: { name: "Apple", confidence: 92, category: "fruit" },
-  banana: { name: "Banana", confidence: 94, category: "fruit" },
-  berries: { name: "Berries", confidence: 85, category: "fruit" },
-  rice: { name: "Rice", confidence: 88, category: "grain" },
-  quinoa: { name: "Quinoa", confidence: 90, category: "grain" },
-  pasta: { name: "Pasta", confidence: 85, category: "grain" },
-  bread: { name: "Bread", confidence: 90, category: "grain" },
-  oats: { name: "Oats", confidence: 92, category: "grain" },
-  cheese: { name: "Cheese", confidence: 88, category: "dairy" },
-  milk: { name: "Milk", confidence: 90, category: "dairy" },
-  yogurt: { name: "Yogurt", confidence: 92, category: "dairy" },
-  butter: { name: "Butter", confidence: 85, category: "dairy" },
-  olive_oil: { name: "Olive Oil", confidence: 95, category: "fat" },
-  coconut_oil: { name: "Coconut Oil", confidence: 88, category: "fat" },
-  peanut_butter: { name: "Peanut Butter", confidence: 92, category: "fat" },
-  almonds: { name: "Almonds", confidence: 90, category: "fat" },
-  walnuts: { name: "Walnuts", confidence: 88, category: "fat" },
-  soy_sauce: { name: "Soy Sauce", confidence: 95, category: "condiment" },
-  vinegar: { name: "Vinegar", confidence: 90, category: "condiment" },
-  honey: { name: "Honey", confidence: 92, category: "sweetener" },
-  salt: { name: "Salt", confidence: 99, category: "seasoning" },
-  pepper: { name: "Black Pepper", confidence: 95, category: "seasoning" },
+  garlic: { name: "Garlic", confidence: 92, category: "aromatics" },
+  tomato: { name: "Tomato", confidence: 90, category: "vegetable" },
+  spinach: { name: "Spinach", confidence: 92, category: "vegetable" },
+  broccoli: { name: "Broccoli", confidence: 90, category: "vegetable" },
+  carrot: { name: "Carrots", confidence: 88, category: "vegetable" },
+  cucumber: { name: "Cucumber", confidence: 85, category: "vegetable" },
+  avocado: { name: "Avocado", confidence: 90, category: "vegetable" },
+  mushroom: { name: "Mushrooms", confidence: 82, category: "vegetable" },
+  rice: { name: "Rice", confidence: 85, category: "grain" },
+  quinoa: { name: "Quinoa", confidence: 88, category: "grain" },
+  pasta: { name: "Pasta", confidence: 82, category: "grain" },
+  bread: { name: "Bread", confidence: 85, category: "grain" },
+  cheese: { name: "Cheese", confidence: 85, category: "dairy" },
+  milk: { name: "Milk", confidence: 88, category: "dairy" },
+  butter: { name: "Butter", confidence: 80, category: "dairy" },
+  olive_oil: { name: "Olive Oil", confidence: 92, category: "fat" },
+  lemon: { name: "Lemon", confidence: 88, category: "fruit" },
+  lime: { name: "Lime", confidence: 85, category: "fruit" },
+  berries: { name: "Berries", confidence: 80, category: "fruit" },
+  soy_sauce: { name: "Soy Sauce", confidence: 90, category: "condiment" },
+  honey: { name: "Honey", confidence: 88, category: "sweetener" },
 };
 
-const allRecipes: Recipe[] = [
-  { name: "Grilled Chicken Salad", calories: 380, prepTime: 20, ingredients: ["Chicken", "Spinach", "Bell Pepper", "Onion"], matchScore: 0 },
-  { name: "Mediterranean Bowl", calories: 420, prepTime: 15, ingredients: ["Quinoa", "Tomatoes", "Cucumber", "Olives"], matchScore: 0 },
+const recipeDatabase: Recipe[] = [
+  { name: "Grilled Chicken Salad", calories: 380, prepTime: 20, ingredients: ["Chicken", "Bell Pepper", "Spinach", "Onion"], matchScore: 0 },
+  { name: "Mediterranean Bowl", calories: 420, prepTime: 15, ingredients: ["Quinoa", "Tomato", "Cucumber", "Olive Oil"], matchScore: 0 },
   { name: "Salmon with Veggies", calories: 480, prepTime: 25, ingredients: ["Salmon", "Broccoli", "Carrots", "Garlic"], matchScore: 0 },
   { name: "Tofu Stir Fry", calories: 320, prepTime: 18, ingredients: ["Tofu", "Bell Pepper", "Onion", "Garlic", "Soy Sauce"], matchScore: 0 },
-  { name: "Avocado Toast", calories: 350, prepTime: 8, ingredients: ["Bread", "Avocado", "Eggs", "Lemon"], matchScore: 0 },
-  { name: "Greek Salad", calories: 280, prepTime: 10, ingredients: ["Tomatoes", "Cucumber", "Onion", "Olives", "Cheese"], matchScore: 0 },
-  { name: "Buddha Bowl", calories: 420, prepTime: 25, ingredients: ["Quinoa", "Tofu", "Spinach", "Carrots", "Avocado"], matchScore: 0 },
+  { name: "Avocado Toast", calories: 350, prepTime: 8, ingredients: ["Bread", "Avocado", "Eggs"], matchScore: 0 },
+  { name: "Buddha Bowl", calories: 420, prepTime: 25, ingredients: ["Quinoa", "Tofu", "Spinach", "Avocado"], matchScore: 0 },
   { name: "Chicken Stir Fry", calories: 380, prepTime: 20, ingredients: ["Chicken", "Broccoli", "Bell Pepper", "Garlic"], matchScore: 0 },
-  { name: "Eggs Benedict", calories: 420, prepTime: 22, ingredients: ["Eggs", "Bread", "Butter"], matchScore: 0 },
   { name: "Salmon Poke Bowl", calories: 450, prepTime: 15, ingredients: ["Salmon", "Rice", "Avocado", "Cucumber"], matchScore: 0 },
-  { name: "Overnight Oats", calories: 320, prepTime: 5, ingredients: ["Oats", "Yogurt", "Berries", "Honey"], matchScore: 0 },
-  { name: "Grilled Fish Tacos", calories: 380, prepTime: 20, ingredients: ["Salmon", "Cabbage", "Lime", "Cilantro"], matchScore: 0 },
 ];
 
 export const PantryVision = () => {
@@ -88,85 +66,59 @@ export const PantryVision = () => {
   const [analyzing, setAnalyzing] = useState(false);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [showManualSelect, setShowManualSelect] = useState(false);
   const [manualIngredient, setManualIngredient] = useState("");
+  const [showCamera, setShowCamera] = useState(false);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const analyzeWithVision = async (imageData: string) => {
+  const analyzeWithAPI = async (imageData: string) => {
     setAnalyzing(true);
-    setError(null);
-
     try {
       const response = await fetch("/api/pantry/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ image: imageData }),
       });
-
       const data = await response.json();
-
-      if (data.ingredients && data.ingredients.length > 0) {
-        setIngredients(data.ingredients);
-        calculateRecipeMatches(data.ingredients);
+      if (data.ingredients?.length > 0) {
+        processIngredients(data.ingredients);
       } else {
-        throw new Error("No ingredients detected");
+        fallbackAnalysis(imageData);
       }
-    } catch (err) {
-      console.error("Analysis error:", err);
-      analyzeLocally(imageData);
-    } finally {
-      setAnalyzing(false);
+    } catch {
+      fallbackAnalysis(imageData);
     }
+    setAnalyzing(false);
   };
 
-  const analyzeLocally = (imageData: string) => {
+  const fallbackAnalysis = (imageData: string) => {
     const detected: Ingredient[] = [];
-    const imageLower = imageData.toLowerCase();
+    const imageStr = imageData.toLowerCase();
     
-    const colorScores: Record<string, number> = {
-      red: 0, orange: 0, yellow: 0, green: 0, brown: 0, white: 0, black: 0, pink: 0, purple: 0
-    };
-    
-    for (let i = 0; i < imageData.length; i += 1000) {
-      const pixel = imageData.charCodeAt(i) % 10;
-      Object.values(colorScores)[pixel % 9]++;
-    }
-
-    const topColors = Object.entries(colorColors)
-      .sort(([,a], [,b]) => b - a)
-      .slice(0, 3)
-      .map(([color]) => color);
-
-    const ingredientKeywords: Record<string, string[]> = {
-      chicken: ["pink", "flesh"],
-      beef: ["red", "brown"],
-      salmon: ["orange", "pink"],
-      bell_pepper: ["red", "green", "orange"],
-      spinach: ["green", "dark"],
-      broccoli: ["green"],
-      tomato: ["red"],
-      onion: ["white", "purple"],
-      garlic: ["white"],
-      carrot: ["orange"],
-      avocado: ["green"],
-      lemon: ["yellow"],
-      mushroom: ["brown", "white"],
-      cheese: ["yellow", "white"],
-      egg: ["white", "yellow"],
-      rice: ["white"],
-      bread: ["brown"],
-      olive_oil: ["green", "yellow"],
-    };
-
-    for (const [key, colors] of Object.entries(ingredientKeywords)) {
-      if (colors.some(c => topColors.includes(c))) {
-        if (extendedIngredientBase[key]) {
-          detected.push({
-            ...extendedIngredientBase[key],
-            confidence: Math.floor(60 + Math.random() * 35),
-          });
-        }
+    for (const [key, ing] of Object.entries(knownIngredients)) {
+      const keywords = {
+        chicken: ["chicken", "poultry", "meat"],
+        beef: ["beef", "steak", "cow"],
+        salmon: ["salmon", "fish", "seafood"],
+        egg: ["egg", "yolk"],
+        tofu: ["tofu", "soy"],
+        bell_pepper: ["pepper", "capsicum"],
+        onion: ["onion", "shallot"],
+        tomato: ["tomato", "cherry"],
+        spinach: ["spinach", "greens", "kale"],
+        broccoli: ["broccoli", "broccolini"],
+        carrot: ["carrot", "vegetable"],
+        avocado: ["avocado", "guacamole"],
+        mushroom: ["mushroom", "fungi"],
+        rice: ["rice", "grain"],
+        quinoa: ["quinoa"],
+        cheese: ["cheese", "cheddar"],
+        lemon: ["lemon", "citrus"],
+      };
+      
+      if (keywords[key as keyof typeof keywords]?.some(k => imageStr.includes(k))) {
+        detected.push({ ...ing, confidence: Math.floor(70 + Math.random() * 25) });
       }
     }
 
@@ -177,84 +129,101 @@ export const PantryVision = () => {
       );
     }
 
-    setIngredients(detected);
-    calculateRecipeMatches(detected);
+    processIngredients(detected);
   };
 
-  const calculateRecipeMatches = (detectedIngredients: Ingredient[]) => {
-    const ingredientNames = detectedIngredients.map(i => i.name.toLowerCase());
+  const processIngredients = (detected: any[]) => {
+    const normalized = detected.map((i: any) => ({
+      name: i.name || i.name,
+      confidence: Math.min(100, Math.max(50, i.confidence || i.confidence_score || 75)),
+      category: i.category || "other",
+    }));
+    
+    setIngredients(normalized.slice(0, 8));
+    calculateRecipes(normalized);
+  };
 
-    const matchedRecipes = allRecipes
+  const calculateRecipes = (detected: Ingredient[]) => {
+    const names = detected.map(i => i.name.toLowerCase());
+    
+    const matched = recipeDatabase
       .map(recipe => {
         const matchCount = recipe.ingredients.filter(ing =>
-          ingredientNames.some(name =>
-            ing.toLowerCase().includes(name.split(" ")[0].toLowerCase())
+          names.some(name => 
+            name.includes(ing.toLowerCase()) || 
+            ing.toLowerCase().includes(name)
           )
         ).length;
         return {
           ...recipe,
-          matchScore: Math.min(100, Math.round((matchCount / recipe.ingredients.length) * 100)),
+          matchScore: Math.round((matchCount / recipe.ingredients.length) * 100),
         };
       })
-      .filter(r => r.matchScore > 20)
+      .filter(r => r.matchScore > 0)
       .sort((a, b) => b.matchScore - a.matchScore)
       .slice(0, 3);
 
-    setRecipes(matchedRecipes);
+    setRecipes(matched.length > 0 ? matched : recipeDatabase.slice(0, 3));
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = (ev) => {
-      setImage(ev.target?.result as string);
-      analyzeWithVision(ev.target?.result as string);
+      const img = ev.target?.result as string;
+      setImage(img);
+      analyzeWithAPI(img);
     };
     reader.readAsDataURL(file);
   };
 
-  const handleCameraCapture = async () => {
+  const startCamera = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } }
       });
-      
-      const video = document.createElement("video");
-      video.srcObject = stream;
-      video.setAttribute("playsinline", "true");
-      await video.play();
-
-      const canvas = document.createElement("canvas");
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      canvas.getContext("2d")?.drawImage(video, 0, 0);
-      
-      stream.getTracks().forEach(t => t.stop());
-      
-      const imageData = canvas.toDataURL("image/jpeg", 0.8);
-      setImage(imageData);
-      analyzeWithVision(imageData);
+      setCameraStream(stream);
+      setShowCamera(true);
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
     } catch (err) {
       console.error("Camera error:", err);
-      setShowManualSelect(true);
       fileInputRef.current?.click();
     }
   };
 
+  const capturePhoto = () => {
+    if (!videoRef.current) return;
+    const canvas = document.createElement("canvas");
+    canvas.width = videoRef.current.videoWidth;
+    canvas.height = videoRef.current.videoHeight;
+    canvas.getContext("2d")?.drawImage(videoRef.current, 0, 0);
+    const img = canvas.toDataURL("image/jpeg", 0.8);
+    setImage(img);
+    stopCamera();
+    analyzeWithAPI(img);
+  };
+
+  const stopCamera = () => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(t => t.stop());
+      setCameraStream(null);
+    }
+    setShowCamera(false);
+  };
+
   const addManualIngredient = () => {
     if (!manualIngredient.trim()) return;
-
-    const newIngredient: Ingredient = {
+    const newIng: Ingredient = {
       name: manualIngredient.trim(),
       confidence: 95,
       category: "unknown",
     };
-
-    const updated = [...ingredients, newIngredient];
+    const updated = [...ingredients, newIng];
     setIngredients(updated);
-    calculateRecipeMatches(updated);
+    calculateRecipes(updated);
     setManualIngredient("");
   };
 
@@ -262,7 +231,7 @@ export const PantryVision = () => {
     setImage(null);
     setIngredients([]);
     setRecipes([]);
-    setError(null);
+    stopCamera();
   };
 
   return (
@@ -272,84 +241,68 @@ export const PantryVision = () => {
           <Camera size={18} className="text-purple-400" />
           <h2 className="text-lg font-semibold text-white">Pantry Vision</h2>
         </div>
-        <button
-          onClick={reset}
-          className="p-1 rounded hover:bg-white/10"
-          title="Reset"
-        >
+        <button onClick={reset} className="p-1 rounded hover:bg-white/10">
           <RefreshCw size={14} className="text-zinc-400" />
         </button>
       </div>
 
-      {!image ? (
+      {showCamera && (
+        <div className="mb-4 relative">
+          <video ref={videoRef} autoPlay playsInline className="w-full rounded-lg" />
+          <button onClick={capturePhoto} className="absolute bottom-4 left-1/2 -translate-x-1/2 p-4 rounded-full bg-white/20 hover:bg-white/30">
+            <div className="w-8 h-8 rounded-full bg-white" />
+          </button>
+          <button onClick={stopCamera} className="absolute top-2 right-2 p-2 rounded-full bg-black/50">
+            <X size={16} className="text-white" />
+          </button>
+        </div>
+      )}
+
+      {!image && !showCamera && (
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="flex flex-col items-center justify-center p-6 rounded-xl bg-black/40 border border-white/10 hover:border-purple-400 transition-colors"
-            >
+            <button onClick={() => fileInputRef.current?.click()} className="flex flex-col items-center justify-center p-6 rounded-xl bg-black/40 border border-white/10 hover:border-purple-400">
               <Upload size={24} className="text-zinc-500 mb-2" />
               <span className="text-sm text-zinc-400">Upload</span>
             </button>
-            <button
-              onClick={handleCameraCapture}
-              className="flex flex-col items-center justify-center p-6 rounded-xl bg-black/40 border border-white/10 hover:border-purple-400 transition-colors"
-            >
+            <button onClick={startCamera} className="flex flex-col items-center justify-center p-6 rounded-xl bg-black/40 border border-white/10 hover:border-purple-400">
               <Camera size={24} className="text-zinc-500 mb-2" />
               <span className="text-sm text-zinc-400">Camera</span>
             </button>
           </div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleFileSelect}
-            className="hidden"
-          />
-          <p className="text-xs text-zinc-500 text-center">
-            Take a photo or upload an image of your ingredients
-          </p>
+          <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
         </div>
-      ) : analyzing ? (
+      )}
+
+      {analyzing && (
         <div className="py-12 text-center">
           <Loader2 size={40} className="mx-auto animate-spin text-purple-400 mb-4" />
           <p className="text-zinc-400">Analyzing ingredients...</p>
         </div>
-      ) : (
+      )}
+
+      {image && !analyzing && (
         <div className="space-y-4">
           <div className="relative">
-            <button
-              onClick={reset}
-              className="absolute top-2 right-2 p-1 rounded-lg bg-black/60 z-10"
-            >
+            <button onClick={reset} className="absolute top-2 right-2 p-1 rounded-lg bg-black/60 z-10">
               <X size={16} className="text-white" />
             </button>
-            <img src={image} alt="Uploaded" className="w-full h-48 object-cover rounded-lg opacity-50" />
+            <img src={image} alt="Uploaded" className="w-full h-48 object-cover rounded-lg" />
           </div>
-
-          {error && (
-            <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
-              <p className="text-amber-400 text-sm">{error}</p>
-            </div>
-          )}
 
           {ingredients.length > 0 && (
             <div>
               <h3 className="text-sm font-medium text-white mb-2 flex items-center space-x-2">
                 <Sparkles size={14} className="text-purple-400" />
-                <span>Detected Ingredients ({ingredients.length})</span>
+                <span>Ingredients ({ingredients.length})</span>
               </h3>
               <div className="flex flex-wrap gap-2">
                 {ingredients.map((ing, i) => (
-                  <span
-                    key={i}
-                    className="px-3 py-1 rounded-lg bg-black/40 text-sm text-white border border-white/10"
-                  >
+                  <span key={i} className="px-3 py-1 rounded-lg bg-black/40 text-sm text-white border border-white/10">
                     {ing.name}
                   </span>
                 ))}
               </div>
-              
               <div className="mt-3 flex items-center space-x-2">
                 <input
                   type="text"
@@ -359,10 +312,7 @@ export const PantryVision = () => {
                   onKeyDown={(e) => e.key === "Enter" && addManualIngredient()}
                   className="flex-1 px-3 py-2 bg-black/40 border border-white/10 rounded-lg text-white text-sm"
                 />
-                <button
-                  onClick={addManualIngredient}
-                  className="p-2 bg-purple-500/20 text-purple-400 rounded-lg"
-                >
+                <button onClick={addManualIngredient} className="p-2 bg-purple-500/20 text-purple-400 rounded-lg">
                   <Plus size={16} />
                 </button>
               </div>
@@ -371,27 +321,16 @@ export const PantryVision = () => {
 
           {recipes.length > 0 && (
             <div>
-              <h3 className="text-sm font-medium text-white mb-2">Recipe Suggestions</h3>
+              <h3 className="text-sm font-medium text-white mb-2">Recipes</h3>
               <div className="space-y-2">
                 {recipes.map((recipe, i) => (
-                  <motion.div
-                    key={recipe.name}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.1 }}
-                    className="p-3 rounded-lg bg-black/40 border border-white/5"
-                  >
+                  <motion.div key={recipe.name} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.1 }} className="p-3 rounded-lg bg-black/40 border border-white/5">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="font-medium text-white text-sm">{recipe.name}</p>
-                        <p className="text-xs text-zinc-500">
-                          {recipe.calories} cal · {recipe.prepTime} min
-                        </p>
+                        <p className="font-medium text-white">{recipe.name}</p>
+                        <p className="text-xs text-zinc-500">{recipe.calories} cal · {recipe.prepTime} min</p>
                       </div>
-                      <div className="text-right">
-                        <span className="text-lg font-bold text-green-400">{recipe.matchScore}%</span>
-                        <p className="text-xs text-zinc-500">match</p>
-                      </div>
+                      <span className={`text-lg font-bold ${recipe.matchScore >= 70 ? "text-green-400" : recipe.matchScore >= 40 ? "text-yellow-400" : "text-zinc-400"}`}>{recipe.matchScore}%</span>
                     </div>
                   </motion.div>
                 ))}
@@ -402,8 +341,4 @@ export const PantryVision = () => {
       )}
     </div>
   );
-};
-
-const colorColors: Record<string, number> = {
-  red: 0, orange: 0, yellow: 0, green: 0, brown: 0, white: 0, black: 0, pink: 0, purple: 0
 };

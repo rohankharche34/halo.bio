@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { ChefHat, Clock, Flame, Zap, CheckCircle, X, Apple, Leaf, Fish, Beef } from "lucide-react";
 import { motion } from "framer-motion";
-import { logMeal, getMealLogs, updateDietPreference } from "@/app/actions/auth";
+import { logMeal, updateDietPreference, getCurrentUser } from "@/app/actions/auth";
 import { getMealRecommendations, getPersonalizedAdvice, calculateStabilityScore } from "@/lib/contextAgent";
 
 interface Meal {
@@ -24,6 +24,11 @@ interface ContextScore {
   overallStability: number;
 }
 
+interface User {
+  id: string;
+  settings: string | null;
+}
+
 const dietIcons: Record<string, React.ElementType> = {
   none: Apple,
   keto: Beef,
@@ -33,6 +38,11 @@ const dietIcons: Record<string, React.ElementType> = {
   mediterranean: Leaf,
 };
 
+const NON_VEG_INGREDIENTS = [
+  "chicken", "beef", "pork", "salmon", "tuna", "shrimp", "egg", "turkey", "lamb", "bacon",
+  "steak", "ground beef", "meat", "fish", "ham", "sausage", "duck", "veal", "prosciutto"
+];
+
 export const MealRecommendations = () => {
   const [meals, setMeals] = useState<Meal[]>([]);
   const [advice, setAdvice] = useState<string>("");
@@ -40,12 +50,27 @@ export const MealRecommendations = () => {
   const [loading, setLoading] = useState(true);
   const [logging, setLogging] = useState<string | null>(null);
   const [dietPref, setDietPref] = useState("none");
+  const [user, setUser] = useState<User | null>(null);
+
+  const loadDietPreference = async (): Promise<string> => {
+    try {
+      const currentUser = await getCurrentUser();
+      if (currentUser?.settings) {
+        const settings = JSON.parse(currentUser.settings);
+        return settings.dietPreference || "none";
+      }
+    } catch {}
+    return "none";
+  };
 
   useEffect(() => {
     const fetchData = async () => {
       try {
+        const diet = await loadDietPreference();
+        setDietPref(diet);
+        
         const [recs, adv, sc] = await Promise.all([
-          getMealRecommendations(),
+          getMealRecommendations(60, diet as any),
           getPersonalizedAdvice(),
           calculateStabilityScore(),
         ]);
@@ -65,7 +90,10 @@ export const MealRecommendations = () => {
     setLogging(meal.name);
     try {
       await logMeal(meal.name, meal.calories, meal.glycemicIndex, meal.type);
-      const [recs, sc] = await Promise.all([getMealRecommendations(), calculateStabilityScore()]);
+      const [recs, sc] = await Promise.all([
+        getMealRecommendations(60, dietPref as any),
+        calculateStabilityScore()
+      ]);
       setMeals(recs);
       setScores(sc);
     } catch (error) {
@@ -80,6 +108,19 @@ export const MealRecommendations = () => {
     const recs = await getMealRecommendations(60, diet as any);
     setMeals(recs);
   };
+
+  const isVegCompatible = (meal: Meal): boolean => {
+    if (dietPref === "vegan") {
+      const mealStr = `${meal.name} ${meal.ingredients.join(" ")}`.toLowerCase();
+      return !NON_VEG_INGREDIENTS.some(ing => mealStr.includes(ing.toLowerCase()));
+    }
+    if (dietPref === "keto" || dietPref === "paleo") {
+      return true;
+    }
+    return true;
+  };
+
+  const filteredMeals = meals.filter(meal => isVegCompatible(meal));
 
   const getMealIcon = (type: string) => {
     switch (type) {
@@ -150,59 +191,63 @@ export const MealRecommendations = () => {
       </div>
 
       <div className="space-y-3">
-        {meals.map((meal, i) => (
-          <motion.div
-            key={meal.name}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.1 }}
-            className="p-4 rounded-xl bg-black/40 border border-white/5"
-          >
-            <div className="flex items-start justify-between mb-2">
-              <div>
-                <div className="flex items-center space-x-2">
-                  <span className="text-lg">{getMealIcon(meal.type)}</span>
-                  <p className="font-medium text-white">{meal.name}</p>
+        {(filteredMeals.length > 0 ? filteredMeals : meals).map((meal, i) => {
+          const vegOk = isVegCompatible(meal);
+          return (
+            <motion.div
+              key={meal.name}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.1 }}
+              className={`p-4 rounded-xl bg-black/40 border ${!vegOk ? "border-red-500/30" : "border-white/5"}`}
+            >
+              <div className="flex items-start justify-between mb-2">
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-lg">{getMealIcon(meal.type)}</span>
+                    <p className="font-medium text-white">{meal.name}</p>
+                    {!vegOk && <span className="text-xs text-red-400">⚠️</span>}
+                  </div>
+                  <p className="text-xs text-zinc-500 mt-1">{meal.reason}</p>
                 </div>
-                <p className="text-xs text-zinc-500 mt-1">{meal.reason}</p>
+                <button
+                  onClick={() => handleLogMeal(meal)}
+                  disabled={logging === meal.name}
+                  className={`p-2 rounded-lg transition-colors ${
+                    logging === meal.name
+                      ? "bg-green-500/20 text-green-400"
+                      : "bg-[color:var(--color-halo-blue)]/20 text-[color:var(--color-halo-blue)] hover:bg-[color:var(--color-halo-blue)]/30"
+                  }`}
+                >
+                  {logging === meal.name ? <CheckCircle size={16} /> : <X size={16} />}
+                </button>
               </div>
-              <button
-                onClick={() => handleLogMeal(meal)}
-                disabled={logging === meal.name}
-                className={`p-2 rounded-lg transition-colors ${
-                  logging === meal.name
-                    ? "bg-green-500/20 text-green-400"
-                    : "bg-[color:var(--color-halo-blue)]/20 text-[color:var(--color-halo-blue)] hover:bg-[color:var(--color-halo-blue)]/30"
-                }`}
-              >
-                {logging === meal.name ? <CheckCircle size={16} /> : <X size={16} />}
-              </button>
-            </div>
-            
-            <div className="flex items-center space-x-4 text-xs text-zinc-500">
-              <div className="flex items-center space-x-1">
-                <Flame size={12} />
-                <span>{meal.calories} cal</span>
+              
+              <div className="flex items-center space-x-4 text-xs text-zinc-500">
+                <div className="flex items-center space-x-1">
+                  <Flame size={12} />
+                  <span>{meal.calories} cal</span>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <Clock size={12} />
+                  <span>{meal.prepTime} min</span>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <Zap size={12} />
+                  <span>GI: {meal.glycemicIndex}</span>
+                </div>
               </div>
-              <div className="flex items-center space-x-1">
-                <Clock size={12} />
-                <span>{meal.prepTime} min</span>
+              
+              <div className="flex flex-wrap gap-1 mt-3">
+                {meal.ingredients.slice(0, 4).map((ing) => (
+                  <span key={ing} className="px-2 py-0.5 rounded bg-white/5 text-xs text-zinc-400">
+                    {ing}
+                  </span>
+                ))}
               </div>
-              <div className="flex items-center space-x-1">
-                <Zap size={12} />
-                <span>GI: {meal.glycemicIndex}</span>
-              </div>
-            </div>
-            
-            <div className="flex flex-wrap gap-1 mt-3">
-              {meal.ingredients.slice(0, 4).map((ing) => (
-                <span key={ing} className="px-2 py-0.5 rounded bg-white/5 text-xs text-zinc-400">
-                  {ing}
-                </span>
-              ))}
-            </div>
-          </motion.div>
-        ))}
+            </motion.div>
+          );
+        })}
       </div>
     </motion.div>
   );
