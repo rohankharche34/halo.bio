@@ -73,7 +73,7 @@ export const HaloSphere = () => {
     };
   };
 
-  const stability = scores?.overallStability ?? 50;
+  const stability = scores?.overallStability ?? 0;
   const colors = getAuraColors(stability);
 
   return (

@@ -46,7 +46,7 @@ const NON_VEG_INGREDIENTS = [
 export const MealRecommendations = () => {
   const [meals, setMeals] = useState<Meal[]>([]);
   const [advice, setAdvice] = useState<string>("");
-  const [scores, setScores] = useState<ContextScore>({ sleepScore: 50, circadianScore: 50, activityScore: 50, mealConsistency: 50, overallStability: 50 });
+  const [scores, setScores] = useState<ContextScore>({ sleepScore: 0, circadianScore: 0, activityScore: 0, mealConsistency: 0, overallStability: 0 });
   const [loading, setLoading] = useState(true);
   const [logging, setLogging] = useState<string | null>(null);
   const [dietPref, setDietPref] = useState("none");
