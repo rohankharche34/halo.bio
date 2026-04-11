@@ -1,19 +1,25 @@
-const SUPABASE_URL = process.env.SUPABASE_URL!;
-const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY!;
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_KEY) {
+  console.error("Missing SUPABASE_URL or SUPABASE_ANON_KEY environment variables");
+}
 
 async function supabaseFetch(table: string, options: {
   method?: string;
   body?: any;
   params?: Record<string, string>;
 } = {}) {
+  if (!SUPABASE_URL || !SUPABASE_KEY) {
+    throw new Error("Supabase credentials not configured. Please set SUPABASE_URL and SUPABASE_ANON_KEY in environment variables.");
+  }
+  
   const { method = "GET", body, params } = options;
   
   const url = new URL(`${SUPABASE_URL}/rest/v1/${table}`);
   if (params) {
     Object.entries(params).forEach(([k, v]) => url.searchParams.append(k, v));
   }
-
-  console.log("SUPABASE FETCH:", method, url.toString(), "body:", body);
 
   const headers: Record<string, string> = {
     "apikey": SUPABASE_KEY,
@@ -30,8 +36,6 @@ async function supabaseFetch(table: string, options: {
     headers,
     body: body ? JSON.stringify(body) : undefined,
   });
-
-  console.log("SUPABASE RESPONSE:", res.status);
 
   if (!res.ok) {
     const err = await res.text();
@@ -159,9 +163,7 @@ class Statement {
       if (where) {
         params[where.field] = `eq.${where.value}`;
       }
-      console.log("UPDATE:", table, data, params);
-      const result = await supabaseFetch(table, { method: "PATCH", body: data, params });
-      console.log("UPDATE result:", result);
+      await supabaseFetch(table, { method: "PATCH", body: data, params });
       return { changes: 1 };
     }
 
@@ -205,7 +207,6 @@ class Statement {
     }
 
     const { data, error } = await supabaseFetch(table, { params });
-    console.log("SELECT ONE:", table, params, "result:", data);
     
     if (error) return null;
     const result = Array.isArray(data) ? data[0] || null : data;
