@@ -19,7 +19,7 @@ interface CircadianData {
 export const CircadianGuide = () => {
   const [timeState, setTimeState] = useState<CircadianData | null>(null);
   const [currentTime, setCurrentTime] = useState<string>("");
-  const [circadianScore, setCircadianScore] = useState(87);
+  const [circadianScore, setCircadianScore] = useState(0);
 
   const phases: Record<string, CircadianData> = {
     morning: { 

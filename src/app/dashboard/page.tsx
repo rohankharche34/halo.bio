@@ -5,9 +5,11 @@ import { CircadianGuide } from "@/components/CircadianGuide";
 import { SleepLogger } from "@/components/SleepLogger";
 import { LightExposureLogger } from "@/components/LightExposureLogger";
 import { SleepHistory } from "@/components/SleepHistory";
+import { CalendarView } from "@/components/CalendarView";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
-import { Brain, Zap, Heart, Moon, Sun, TrendingUp, Activity, Clock, Target, Battery, Eye, Plus, ChevronDown, ChevronUp } from "lucide-react";
+import { Brain, Zap, Heart, Moon, Sun, TrendingUp, Activity, Clock, Target, Battery, Eye, Plus, ChevronDown, ChevronUp, Calendar } from "lucide-react";
+import { getSleepLogs, getCircadianHistory, getMealLogs } from "@/app/actions/auth";
 
 interface MetricCard {
   name: string;
@@ -18,14 +20,54 @@ interface MetricCard {
   color: string;
 }
 
-const mockMetrics: MetricCard[] = [
-  { name: "Energy Potential", value: "87", unit: "%", icon: Zap, trend: 5, color: "text-yellow-400" },
-  { name: "Recovery Index", value: "92", unit: "%", icon: Heart, trend: 3, color: "text-green-400" },
-  { name: "Cognitive Load", value: "64", unit: "%", icon: Brain, trend: -2, color: "text-blue-400" },
-  { name: "Sleep Score", value: "8.2", unit: "h", icon: Moon, trend: 8, color: "text-indigo-400" },
-  { name: "Focus Window", value: "4.5", unit: "h", icon: Target, trend: 12, color: "text-cyan-400" },
-  { name: "Activity Level", value: "7200", unit: "steps", icon: Activity, trend: 15, color: "text-orange-400" },
-];
+const DEFAULT_METRICS: MetricCard[] = [
+  { name: "Energy Potential", value: "0", unit: "%", icon: Zap, trend: 0, color: "text-yellow-400" },
+  { name: "Recovery Index", value: "0", unit: "%", icon: Heart, trend: 0, color: "text-green-400" },
+  { name: "Cognitive Load", value: "0", unit: "%", icon: Brain, trend: 0, color: "text-blue-400" },
+  { name: "Sleep Score", value: "0", unit: "h", icon: Moon, trend: 0, color: "text-indigo-400" },
+  { name: "Focus Window", value: "0", unit: "h", icon: Target, trend: 0, color: "text-cyan-400" },
+  { name: "Activity Level", value: "0", unit: "steps", icon: Activity, trend: 0, color: "text-orange-400" },
+] as const;
+
+const ENERGY_FORECAST_HOURS = [6, 8, 10, 12, 14, 16, 18, 20, 22] as const;
+
+async function calculateMetrics() {
+  const sleepLogs = await getSleepLogs(30);
+  const circadianLogs = await getCircadianHistory(30);
+  const mealLogs = await getMealLogs(30);
+
+  const sleepScore = sleepLogs.length > 0 
+    ? Math.round(sleepLogs.reduce((sum, l) => sum + (l.quality || 0), 0) / sleepLogs.length * 10)
+    : 0;
+  
+  const circadianScore = circadianLogs.length > 0
+    ? Math.round(circadianLogs.reduce((sum, l) => sum + (l.score || 0), 0) / circadianLogs.length)
+    : 0;
+
+  const activityScore = circadianLogs.length > 0
+    ? Math.round(circadianLogs.reduce((sum, l) => sum + (l.activityLevel || 0), 0) / circadianLogs.length)
+    : 0;
+
+  const avgSleepDuration = sleepLogs.length > 0
+    ? sleepLogs.reduce((sum, l) => {
+        const sleep = l.sleepTime ? parseFloat(l.sleepTime.replace(/[hH]/, '.')) : 0;
+        const wake = l.wakeTime ? parseFloat(l.wakeTime.replace(/[hH]/, '.')) : 0;
+        return sum + Math.abs(wake - sleep);
+      }, 0) / sleepLogs.length
+    : 0;
+
+  const energyPotential = Math.min(100, Math.round((sleepScore * 0.4 + circadianScore * 0.3 + activityScore * 0.3)));
+  const recoveryIndex = Math.min(100, Math.round((sleepScore * 0.6 + circadianScore * 0.4)));
+
+  return [
+    { name: "Energy Potential", value: String(energyPotential), unit: "%", icon: Zap, trend: 0, color: "text-yellow-400" },
+    { name: "Recovery Index", value: String(recoveryIndex), unit: "%", icon: Heart, trend: 0, color: "text-green-400" },
+    { name: "Cognitive Load", value: String(Math.max(0, 100 - circadianScore)), unit: "%", icon: Brain, trend: 0, color: "text-blue-400" },
+    { name: "Sleep Score", value: avgSleepDuration.toFixed(1), unit: "h", icon: Moon, trend: 0, color: "text-indigo-400" },
+    { name: "Focus Window", value: String(Math.max(0, circadianScore / 25)), unit: "h", icon: Target, trend: 0, color: "text-cyan-400" },
+    { name: "Activity Level", value: String(activityScore * 100), unit: "steps", icon: Activity, trend: 0, color: "text-orange-400" },
+  ] as MetricCard[];
+}
 
 const insights = [
   { type: "optimal", title: "Peak Performance Window", desc: "Your optimal focus window is 10AM-2PM. Schedule deep work then." },
@@ -41,6 +83,33 @@ export default function DashboardPage() {
   
   const [showLoggers, setShowLoggers] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [metrics, setMetrics] = useState<MetricCard[]>(DEFAULT_METRICS);
+  const [energyForecast, setEnergyForecast] = useState<number[]>(ENERGY_FORECAST_HOURS.map(() => 0));
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const m = await calculateMetrics();
+      setMetrics(m);
+      
+      const sleepLogs = await getSleepLogs(7);
+      const circadianLogs = await getCircadianHistory(7);
+      
+      const avgSleep = sleepLogs.length > 0
+        ? sleepLogs.reduce((sum, l) => sum + (l.quality || 0), 0) / sleepLogs.length
+        : 0;
+      const avgCircadian = circadianLogs.length > 0
+        ? circadianLogs.reduce((sum, l) => sum + (l.score || 0), 0) / circadianLogs.length
+        : 0;
+      
+      const baseEnergy = (avgSleep + avgCircadian) / 2;
+      const forecast = ENERGY_FORECAST_HOURS.map((hour) => {
+        const hourFactor = hour >= 10 && hour <= 14 ? 1.2 : hour >= 18 && hour <= 21 ? 0.7 : 1;
+        return Math.min(100, Math.max(0, baseEnergy * hourFactor));
+      });
+      setEnergyForecast(forecast);
+    };
+    fetchData();
+  }, [refreshKey]);
 
   const handleLogged = () => {
     setRefreshKey(k => k + 1);
@@ -158,6 +227,14 @@ export default function DashboardPage() {
             </h2>
             <SleepHistory key={refreshKey} days={7} />
           </section>
+
+          <section>
+            <h2 className="text-lg font-semibold text-white/80 mb-4 px-2 flex items-center space-x-2">
+              <Calendar size={18} />
+              <span>Calendar</span>
+            </h2>
+            <CalendarView key={refreshKey} />
+          </section>
         </div>
 
         <div className="col-span-1 space-y-6">
@@ -167,7 +244,7 @@ export default function DashboardPage() {
               <span>Bio-metrics</span>
             </h2>
             <div className="space-y-4">
-              {mockMetrics.slice(0, 4).map((metric, i) => {
+              {metrics.slice(0, 4).map((metric, i) => {
                 const Icon = metric.icon;
                 return (
                   <motion.div 
@@ -215,15 +292,15 @@ export default function DashboardPage() {
               <span className="font-medium text-white">Energy Forecast</span>
             </div>
             <div className="flex items-end justify-between text-xs">
-              {[6, 8, 10, 12, 2, 4, 6, 8, 10].map((hour, i) => (
-                <div key={hour} className="flex flex-col items-center">
+              {ENERGY_FORECAST_HOURS.map((hour, i) => (
+                <div key={`hour-${i}`} className="flex flex-col items-center">
                   <motion.div
                     initial={{ height: 0 }}
-                    animate={{ height: `${Math.random() * 30 + 20}%` }}
+                    animate={{ height: `${energyForecast[i] ?? 0}%` }}
                     transition={{ delay: 0.6 + i * 0.05, duration: 0.5 }}
                     className="w-3 bg-white/20 rounded-t"
                   />
-                  <span className="text-zinc-600 mt-1">{hour}{hour >= 12 ? "p" : "a"}</span>
+                  <span className="text-zinc-600 mt-1">{hour}{hour >= 12 ? "pm" : "am"}</span>
                 </div>
               ))}
             </div>

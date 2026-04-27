@@ -87,9 +87,8 @@ class Statement {
         const setPart = setMatch[1];
         paramIndex = (setPart.match(/\?/g) || []).length;
       }
-      const field = whereMatch[1];
-      const isUpperCase = field[0] === field[0].toUpperCase();
-      return { field: isUpperCase ? field : field.toLowerCase(), value: this.params[paramIndex] };
+      const field = whereMatch[1].toLowerCase();
+      return { field, value: this.params[paramIndex] };
     }
     return null;
   }
@@ -97,9 +96,8 @@ class Statement {
   private getOrderBy(): { field: string; ascending: boolean } | null {
     const match = this.sql.match(/order\s+by\s+(\w+)(?:\s+(asc|desc))?/i);
     if (match) {
-      const field = match[1];
-      const isUpperCase = field[0] === field[0].toUpperCase();
-      return { field: isUpperCase ? field : field.toLowerCase(), ascending: (match[2] || "asc").toLowerCase() === "asc" };
+      const field = match[1].toLowerCase();
+      return { field, ascending: (match[2] || "asc").toLowerCase() === "asc" };
     }
     return null;
   }
@@ -116,7 +114,7 @@ class Statement {
     const match = this.sql.match(/\(([^)]+)\)\s*values\s*\(([^)]+)\)/i);
     if (!match) return null;
 
-    const fields = match[1].split(",").map((f: string) => f.trim());
+    const fields = match[1].split(",").map((f: string) => f.trim().toLowerCase());
     const values = this.params;
 
     const data: Record<string, any> = {};
@@ -138,7 +136,7 @@ class Statement {
     
     for (const assignment of assignments) {
       if (assignment.includes("=")) {
-        const [field] = assignment.split("=").map(s => s.trim());
+        const [field] = assignment.split("=").map(s => s.trim().toLowerCase());
         data[field] = this.params[paramIdx];
         paramIdx++;
       }
