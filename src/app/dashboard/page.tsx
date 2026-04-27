@@ -36,15 +36,18 @@ async function calculateMetrics() {
   const circadianLogs = await getCircadianHistory(30);
   const mealLogs = await getMealLogs(30);
 
-  const sleepScore = sleepLogs.length > 0 
-    ? Math.round(sleepLogs.reduce((sum, l) => sum + (l.quality || 0), 0) / sleepLogs.length * 10)
+  const hasSleepLogs = sleepLogs.length > 0;
+  const hasCircadianLogs = circadianLogs.length > 0;
+
+  const sleepScore = hasSleepLogs
+    ? Math.round((sleepLogs.reduce((sum, l) => sum + (l.quality || 0), 0) / sleepLogs.length) * 10)
     : 0;
   
-  const circadianScore = circadianLogs.length > 0
+  const circadianScore = hasCircadianLogs
     ? Math.round(circadianLogs.reduce((sum, l) => sum + (l.score || 0), 0) / circadianLogs.length)
     : 0;
 
-  const activityScore = circadianLogs.length > 0
+  const activityScore = hasCircadianLogs
     ? Math.round(circadianLogs.reduce((sum, l) => sum + (l.activityLevel || 0), 0) / circadianLogs.length)
     : 0;
 
@@ -62,10 +65,10 @@ async function calculateMetrics() {
   return [
     { name: "Energy Potential", value: String(energyPotential), unit: "%", icon: Zap, trend: 0, color: "text-yellow-400" },
     { name: "Recovery Index", value: String(recoveryIndex), unit: "%", icon: Heart, trend: 0, color: "text-green-400" },
-    { name: "Cognitive Load", value: String(Math.max(0, 100 - circadianScore)), unit: "%", icon: Brain, trend: 0, color: "text-blue-400" },
-    { name: "Sleep Score", value: avgSleepDuration.toFixed(1), unit: "h", icon: Moon, trend: 0, color: "text-indigo-400" },
-    { name: "Focus Window", value: String(Math.max(0, circadianScore / 25)), unit: "h", icon: Target, trend: 0, color: "text-cyan-400" },
-    { name: "Activity Level", value: String(activityScore * 100), unit: "steps", icon: Activity, trend: 0, color: "text-orange-400" },
+    { name: "Cognitive Load", value: hasCircadianLogs ? String(Math.max(0, 100 - circadianScore)) : "0", unit: "%", icon: Brain, trend: 0, color: "text-blue-400" },
+    { name: "Sleep Score", value: hasSleepLogs ? avgSleepDuration.toFixed(1) : "0", unit: "h", icon: Moon, trend: 0, color: "text-indigo-400" },
+    { name: "Focus Window", value: hasCircadianLogs ? String(Math.max(0, circadianScore / 25)) : "0", unit: "h", icon: Target, trend: 0, color: "text-cyan-400" },
+    { name: "Activity Level", value: hasCircadianLogs ? String(activityScore * 100) : "0", unit: "steps", icon: Activity, trend: 0, color: "text-orange-400" },
   ] as MetricCard[];
 }
 
@@ -85,6 +88,7 @@ export default function DashboardPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [metrics, setMetrics] = useState<MetricCard[]>(DEFAULT_METRICS);
   const [energyForecast, setEnergyForecast] = useState<number[]>(ENERGY_FORECAST_HOURS.map(() => 0));
+  const [circadianScore, setCircadianScore] = useState(0);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -93,6 +97,8 @@ export default function DashboardPage() {
       
       const sleepLogs = await getSleepLogs(7);
       const circadianLogs = await getCircadianHistory(7);
+      const latestCircadianScore = circadianLogs[0]?.score ?? 0;
+      setCircadianScore(latestCircadianScore);
       
       const avgSleep = sleepLogs.length > 0
         ? sleepLogs.reduce((sum, l) => sum + (l.quality || 0), 0) / sleepLogs.length
@@ -181,7 +187,7 @@ export default function DashboardPage() {
               <Clock size={18} />
               <span>Temporal State</span>
             </h2>
-            <CircadianGuide key={refreshKey} />
+            <CircadianGuide key={refreshKey} circadianScore={circadianScore} />
           </section>
 
           <section className="p-6 rounded-3xl border border-white/5 bg-white/[0.02]">

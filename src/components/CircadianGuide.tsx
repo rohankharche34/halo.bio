@@ -16,10 +16,9 @@ interface CircadianData {
   activity: string;
 }
 
-export const CircadianGuide = () => {
+export const CircadianGuide = ({ circadianScore = 0 }: { circadianScore?: number }) => {
   const [timeState, setTimeState] = useState<CircadianData | null>(null);
   const [currentTime, setCurrentTime] = useState<string>("");
-  const [circadianScore, setCircadianScore] = useState(0);
 
   const phases: Record<string, CircadianData> = {
     morning: { 
@@ -92,6 +91,7 @@ export const CircadianGuide = () => {
   if (!timeState) return null;
 
   const Icon = timeState.icon;
+  const safeCircadianScore = Number.isFinite(circadianScore) ? Math.max(0, Math.min(100, Math.round(circadianScore))) : 0;
 
   return (
     <div className="space-y-4">
@@ -124,13 +124,13 @@ export const CircadianGuide = () => {
             <TrendingUp size={16} className="text-green-400" />
           </div>
           <div className="flex items-end space-x-3">
-            <span className="text-4xl font-bold text-white">{circadianScore}</span>
+            <span className="text-4xl font-bold text-white">{safeCircadianScore}</span>
             <span className="text-sm text-white/40 mb-2">/ 100</span>
           </div>
           <div className="h-1.5 bg-white/10 rounded-full mt-3 overflow-hidden">
             <motion.div 
               initial={{ width: 0 }}
-              animate={{ width: `${circadianScore}%` }}
+              animate={{ width: `${safeCircadianScore}%` }}
               transition={{ delay: 0.3, duration: 1 }}
               className="h-full bg-gradient-to-r from-[color:var(--color-halo-blue)] to-[color:var(--color-halo-green)]"
             />
